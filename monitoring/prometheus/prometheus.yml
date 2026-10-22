@@ -1,0 +1,53 @@
+# ============================================================
+# CRM Customer Care — Prometheus Scrape Configuration
+# ============================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # ── CRM Application (Node.js Express + prom-client) ───────
+  - job_name: "crm-app"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["app:3000"]
+        labels:
+          service: "app"
+          environment: "production"
+
+  # ── Nginx Web Server (nginx-prometheus-exporter) ──────────
+  - job_name: "nginx"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+        labels:
+          service: "nginx"
+          environment: "production"
+
+  # ── PostgreSQL Database (postgres-exporter) ───────────────
+  - job_name: "postgres"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "db"
+          environment: "production"
+
+  # ── Container Metrics (cAdvisor) ──────────────────────────
+  - job_name: "cadvisor"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          service: "container"
+          environment: "production"
+
+  # ── Prometheus Tự Giám Sát ────────────────────────────────
+  - job_name: "prometheus"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"

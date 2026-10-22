@@ -87,6 +87,92 @@ services:
     networks:
       - data
 
+  # ── Prometheus Server ────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: crm-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+      - edge
+      - data
+
+  # ── Grafana Dashboard ────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: crm-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  # ── PostgreSQL Exporter ──────────────────────────────────
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: crm-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-crm_app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-crm_db}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - data
+      - monitoring
+
+  # ── Nginx Prometheus Exporter ────────────────────────────
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.1.0
+    container_name: crm-nginx-exporter
+    restart: unless-stopped
+    command:
+      - "-nginx.scrape-uri=http://nginx:8080/stub_status"
+    depends_on:
+      - nginx
+    networks:
+      - edge
+      - monitoring
+
+  # ── cAdvisor (Container Monitoring) ──────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: crm-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+
 # ── Networks ───────────────────────────────────────────────
 networks:
   edge:
@@ -100,4 +186,7 @@ networks:
 volumes:
   postgres_data:
   nginx_certs:
+  prometheus_data:
+  grafana_data:
+
 

@@ -1,0 +1,16 @@
+# ============================================================
+# CRM Customer Care — Grafana Dashboard Provider
+# ============================================================
+apiVersion: 1
+
+providers:
+  - name: "CRM Dashboards"
+    orgId: 1
+    folder: "CRM System"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false
