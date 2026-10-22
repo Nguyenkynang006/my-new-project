@@ -173,6 +173,35 @@ services:
     networks:
       - monitoring
 
+  # ── Loki — Lưu trữ Log Tập trung ──────────────────────────
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: crm-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./logging/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring
+
+  # ── Promtail — Thu thập Log Docker Containers ────────────
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: crm-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./logging/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+
 # ── Networks ───────────────────────────────────────────────
 networks:
   edge:
@@ -188,5 +217,7 @@ volumes:
   nginx_certs:
   prometheus_data:
   grafana_data:
+  loki_data:
+
 
 

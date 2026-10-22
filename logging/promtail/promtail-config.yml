@@ -1,0 +1,60 @@
+# ============================================================
+# CRM Customer Care — Promtail Configuration
+# ============================================================
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+
+scrape_configs:
+  # ── Tự động phát hiện và thu thập log Docker Containers ──
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      # Chỉ thu thập log của các containers thuộc dự án CRM (crm-*)
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?(crm-[a-zA-Z0-9_-]+)'
+        action: keep
+
+      # Gán nhãn tên container
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?(.*)'
+        target_label: 'container'
+
+      # Hợp đồng tích hợp: Thống nhất nhãn service=app
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?crm-app'
+        target_label: 'service'
+        replacement: 'app'
+
+      # Hợp đồng tích hợp: Thống nhất nhãn service=nginx
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?crm-nginx'
+        target_label: 'service'
+        replacement: 'nginx'
+
+      # Hợp đồng tích hợp: Thống nhất nhãn service=db
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?crm-db'
+        target_label: 'service'
+        replacement: 'db'
+
+      # Gán nhãn môi trường và job
+      - target_label: 'job'
+        replacement: 'crm-docker'
+      - target_label: 'environment'
+        replacement: 'production'
+
+    pipeline_stages:
+      - docker: {}
