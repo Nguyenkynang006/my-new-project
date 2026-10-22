@@ -1,7 +1,7 @@
 version: "3.8"
 
 # ============================================================
-# CRM Customer Care — Docker Compose (Pha 1: App + DB + pgAdmin)
+# CRM Customer Care — Docker Compose
 # ============================================================
 # Khởi chạy:  docker compose up -d --build
 # Dừng:       docker compose down
@@ -9,21 +9,39 @@ version: "3.8"
 # ============================================================
 
 services:
+  # ── Nginx Reverse Proxy & SSL Termination ─────────────────
+  nginx:
+    build: ./nginx
+    container_name: crm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_certs:/etc/nginx/certs
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - edge
+      - monitoring
+
   # ── CRM Application ──────────────────────────────────────
   app:
     build: ./app
     container_name: crm-app
     restart: unless-stopped
     environment:
-      - APP_PORT=${APP_PORT:-3000}
+      - APP_PORT=3000
       - DB_HOST=db
       - DB_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-crm_db}
       - POSTGRES_USER=${POSTGRES_USER:-crm_app}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    # Trong Pha 2 sẽ bỏ ports này — truy cập qua Nginx
-    ports:
-      - "${APP_PORT:-3000}:3000"
+    # Bảo mật: Cổng app không expose trực tiếp ra ngoài — chỉ truy cập qua Nginx
+    expose:
+      - "3000"
     depends_on:
       db:
         condition: service_healthy
@@ -50,7 +68,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # DB KHÔNG publish port ra host — chỉ internal
+    # Bảo mật: DB KHÔNG publish port ra host — chỉ internal
     networks:
       - data
 
@@ -81,3 +99,5 @@ networks:
 # ── Volumes ────────────────────────────────────────────────
 volumes:
   postgres_data:
+  nginx_certs:
+
