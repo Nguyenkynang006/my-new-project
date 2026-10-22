@@ -1,0 +1,96 @@
+<%- include('../partials/header') %>
+
+<nav class="breadcrumb">
+  <a href="/">Dashboard</a>
+  <span class="sep">›</span>
+  <a href="/customers">Khách hàng</a>
+  <span class="sep">›</span>
+  <span class="current"><%= customer ? 'Sửa' : 'Thêm mới' %></span>
+</nav>
+
+<div class="form-card">
+  <% if (errors.length > 0) { %>
+    <div class="alert alert-error">
+      <strong>Vui lòng sửa các lỗi sau:</strong>
+      <ul>
+        <% errors.forEach(function(e) { %>
+          <li><%= e.msg %></li>
+        <% }); %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST"
+        action="<%= customer && customer.id ? '/customers/' + customer.id + '?_method=PUT' : '/customers' %>"
+        class="crm-form" id="customerForm">
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="name" class="form-label">Tên khách hàng <span class="required">*</span></label>
+        <input type="text" id="name" name="name" class="form-input" required
+               value="<%= customer ? customer.name : '' %>"
+               placeholder="VD: Nguyễn Văn An">
+      </div>
+
+      <div class="form-group">
+        <label for="company_name" class="form-label">Tên công ty</label>
+        <input type="text" id="company_name" name="company_name" class="form-input"
+               value="<%= customer ? (customer.company_name || '') : '' %>"
+               placeholder="VD: Công ty TNHH ABC">
+      </div>
+
+      <div class="form-group">
+        <label for="industry" class="form-label">Ngành nghề</label>
+        <input type="text" id="industry" name="industry" class="form-input"
+               value="<%= customer ? (customer.industry || '') : '' %>"
+               placeholder="VD: Công nghệ thông tin">
+      </div>
+
+      <div class="form-group">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" id="email" name="email" class="form-input"
+               value="<%= customer ? (customer.email || '') : '' %>"
+               placeholder="VD: contact@company.vn">
+      </div>
+
+      <div class="form-group">
+        <label for="phone" class="form-label">Số điện thoại</label>
+        <input type="text" id="phone" name="phone" class="form-input"
+               value="<%= customer ? (customer.phone || '') : '' %>"
+               placeholder="VD: 028-1234-5678">
+      </div>
+
+      <div class="form-group">
+        <label for="status" class="form-label">Trạng thái <span class="required">*</span></label>
+        <select id="status" name="status" class="form-input form-select" required>
+          <% Object.entries(statusMap).forEach(function([key, label]) { %>
+            <option value="<%= key %>"
+              <%= customer && customer.status === key ? 'selected' : (!customer && key === 'lead' ? 'selected' : '') %>>
+              <%= label %>
+            </option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group form-group-full">
+      <label for="address" class="form-label">Địa chỉ</label>
+      <textarea id="address" name="address" class="form-input form-textarea" rows="3"
+                placeholder="VD: 123 Nguyễn Huệ, Quận 1, TP.HCM"><%= customer ? (customer.address || '') : '' %></textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="<%= customer && customer.id ? '/customers/' + customer.id : '/customers' %>" class="btn btn-ghost">Hủy</a>
+      <button type="submit" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        <%= customer && customer.id ? 'Cập nhật' : 'Tạo mới' %>
+      </button>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

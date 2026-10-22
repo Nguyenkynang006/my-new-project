@@ -1,0 +1,172 @@
+<%- include('../partials/header') %>
+
+<!-- ── Breadcrumb ──────────────────────────────────────────── -->
+<nav class="breadcrumb">
+  <a href="/">Dashboard</a>
+  <span class="sep">›</span>
+  <a href="/customers">Khách hàng</a>
+  <span class="sep">›</span>
+  <span class="current"><%= customer.name %></span>
+</nav>
+
+<!-- ── Customer Info Card ──────────────────────────────────── -->
+<div class="detail-header">
+  <div class="detail-info">
+    <div class="detail-name-row">
+      <h2 class="detail-name"><%= customer.name %></h2>
+      <span class="badge badge-<%= customer.status %> badge-lg"><%= statusMap[customer.status] %></span>
+    </div>
+    <% if (customer.company_name) { %>
+      <div class="detail-company"><%= customer.company_name %></div>
+    <% } %>
+    <div class="detail-meta">
+      <% if (customer.industry) { %>
+        <span class="meta-item">🏭 <%= customer.industry %></span>
+      <% } %>
+      <% if (customer.email) { %>
+        <span class="meta-item">📧 <%= customer.email %></span>
+      <% } %>
+      <% if (customer.phone) { %>
+        <span class="meta-item">📞 <%= customer.phone %></span>
+      <% } %>
+      <% if (customer.address) { %>
+        <span class="meta-item">📍 <%= customer.address %></span>
+      <% } %>
+    </div>
+    <div class="detail-dates">
+      Tạo: <%= new Date(customer.created_at).toLocaleDateString('vi-VN') %> •
+      Cập nhật: <%= new Date(customer.updated_at).toLocaleDateString('vi-VN') %>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <a href="/customers/<%= customer.id %>/edit" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Sửa
+    </a>
+    <form method="POST" action="/customers/<%= customer.id %>?_method=DELETE" style="display:inline"
+          onsubmit="return confirmDelete(this, '<%= customer.name %>')">
+      <button type="submit" class="btn btn-danger">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        Xóa
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Two-column layout ───────────────────────────────────── -->
+<div class="detail-grid">
+
+  <!-- ── Contacts ────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">👥 Liên hệ (<%= contacts.length %>)</h3>
+      <a href="/customers/<%= customer.id %>/contacts/new" class="btn btn-sm btn-accent">+ Thêm</a>
+    </div>
+    <div class="card-body">
+      <% if (contacts.length === 0) { %>
+        <div class="empty-state-sm">
+          <p>Chưa có liên hệ nào.</p>
+        </div>
+      <% } else { %>
+        <div class="contact-list">
+          <% contacts.forEach(function(c) { %>
+            <div class="contact-card">
+              <div class="contact-avatar"><%= c.first_name.charAt(0) %><%= c.last_name.charAt(0) %></div>
+              <div class="contact-info">
+                <div class="contact-name">
+                  <%= c.first_name %> <%= c.last_name %>
+                  <% if (c.is_primary) { %><span class="badge badge-primary-contact">Chính</span><% } %>
+                </div>
+                <% if (c.job_title) { %><div class="contact-title"><%= c.job_title %></div><% } %>
+                <div class="contact-details">
+                  <% if (c.email) { %><span>📧 <%= c.email %></span><% } %>
+                  <% if (c.phone) { %><span>📞 <%= c.phone %></span><% } %>
+                </div>
+              </div>
+              <div class="contact-actions">
+                <a href="/customers/<%= customer.id %>/contacts/<%= c.id %>/edit" class="btn-icon" title="Sửa">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </a>
+                <form method="POST" action="/customers/<%= customer.id %>/contacts/<%= c.id %>?_method=DELETE"
+                      style="display:inline"
+                      onsubmit="return confirmDelete(this, '<%= c.first_name %> <%= c.last_name %>')">
+                  <button type="submit" class="btn-icon btn-icon-danger" title="Xóa">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- ── Interactions ────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📋 Lịch sử tương tác (<%= interactions.length %>)</h3>
+      <a href="/customers/<%= customer.id %>/interactions/new" class="btn btn-sm btn-accent">+ Thêm</a>
+    </div>
+    <div class="card-body">
+      <% if (interactions.length === 0) { %>
+        <div class="empty-state-sm">
+          <p>Chưa có tương tác nào.</p>
+        </div>
+      <% } else { %>
+        <div class="timeline">
+          <% interactions.forEach(function(i) { %>
+            <div class="timeline-item">
+              <div class="timeline-marker type-<%= i.type %>">
+                <% if (i.type === 'call') { %>📞
+                <% } else if (i.type === 'email') { %>📧
+                <% } else if (i.type === 'meeting') { %>🤝
+                <% } else { %>📝<% } %>
+              </div>
+              <div class="timeline-content">
+                <div class="timeline-header">
+                  <span class="badge badge-type"><%= typeMap[i.type] %></span>
+                  <span class="timeline-time">
+                    <%= new Date(i.occurred_at).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
+                  </span>
+                </div>
+                <div class="timeline-subject"><%= i.subject %></div>
+                <% if (i.notes) { %>
+                  <div class="timeline-notes"><%= i.notes %></div>
+                <% } %>
+                <% if (i.contact_first) { %>
+                  <div class="timeline-contact">👤 <%= i.contact_first %> <%= i.contact_last %></div>
+                <% } %>
+                <form method="POST" action="/customers/<%= customer.id %>/interactions/<%= i.id %>?_method=DELETE"
+                      style="display:inline; margin-top:0.5rem"
+                      onsubmit="return confirmDelete(this, 'tương tác này')">
+                  <button type="submit" class="btn-icon btn-icon-danger btn-xs" title="Xóa">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<%- include('../partials/footer') %>

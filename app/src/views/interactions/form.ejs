@@ -1,0 +1,92 @@
+<%- include('../partials/header') %>
+
+<nav class="breadcrumb">
+  <a href="/">Dashboard</a>
+  <span class="sep">›</span>
+  <a href="/customers">Khách hàng</a>
+  <span class="sep">›</span>
+  <a href="/customers/<%= customer.id %>"><%= customer.name %></a>
+  <span class="sep">›</span>
+  <span class="current">Thêm tương tác</span>
+</nav>
+
+<div class="form-card">
+  <% if (errors.length > 0) { %>
+    <div class="alert alert-error">
+      <strong>Vui lòng sửa các lỗi sau:</strong>
+      <ul>
+        <% errors.forEach(function(e) { %>
+          <li><%= e.msg %></li>
+        <% }); %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST"
+        action="/customers/<%= customer.id %>/interactions"
+        class="crm-form" id="interactionForm">
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="type" class="form-label">Loại tương tác <span class="required">*</span></label>
+        <select id="type" name="type" class="form-input form-select" required>
+          <% Object.entries(typeMap).forEach(function([key, label]) { %>
+            <option value="<%= key %>"
+              <%= interaction && interaction.type === key ? 'selected' : '' %>>
+              <%= label %>
+            </option>
+          <% }); %>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="contact_id" class="form-label">Người liên hệ</label>
+        <select id="contact_id" name="contact_id" class="form-input form-select">
+          <option value="">— Không chỉ định —</option>
+          <% contacts.forEach(function(c) { %>
+            <option value="<%= c.id %>"
+              <%= interaction && interaction.contact_id == c.id ? 'selected' : '' %>>
+              <%= c.first_name %> <%= c.last_name %>
+              <% if (c.job_title) { %> — <%= c.job_title %><% } %>
+            </option>
+          <% }); %>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="subject" class="form-label">Tiêu đề <span class="required">*</span></label>
+        <input type="text" id="subject" name="subject" class="form-input" required
+               value="<%= interaction ? interaction.subject : '' %>"
+               placeholder="VD: Trao đổi về hợp đồng mới">
+      </div>
+
+      <div class="form-group">
+        <label for="occurred_at" class="form-label">Thời điểm</label>
+        <input type="datetime-local" id="occurred_at" name="occurred_at" class="form-input"
+               value="<%= interaction && interaction.occurred_at
+                 ? new Date(interaction.occurred_at).toISOString().slice(0,16)
+                 : new Date().toISOString().slice(0,16) %>">
+      </div>
+    </div>
+
+    <div class="form-group form-group-full">
+      <label for="notes" class="form-label">Ghi chú</label>
+      <textarea id="notes" name="notes" class="form-input form-textarea" rows="5"
+                placeholder="Ghi chú chi tiết về tương tác…"><%= interaction ? (interaction.notes || '') : '' %></textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="/customers/<%= customer.id %>" class="btn btn-ghost">Hủy</a>
+      <button type="submit" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Ghi nhận tương tác
+      </button>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

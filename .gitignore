@@ -25,6 +25,9 @@ loki-data/
 nginx/certs/
 !nginx/certs/.gitkeep
 
+# Backup directories
+backup_before_pha1/
+
 # OS/editor files
 .DS_Store
 Thumbs.db

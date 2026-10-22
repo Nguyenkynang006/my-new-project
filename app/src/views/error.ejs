@@ -1,0 +1,9 @@
+<%- include('partials/header') %>
+
+<div class="error-page">
+  <div class="error-code"><%= status || 500 %></div>
+  <div class="error-message"><%= message %></div>
+  <a href="/" class="btn btn-primary" style="margin-top:2rem">← Về trang chủ</a>
+</div>
+
+<%- include('partials/footer') %>

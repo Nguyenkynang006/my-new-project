@@ -1,0 +1,83 @@
+version: "3.8"
+
+# ============================================================
+# CRM Customer Care — Docker Compose (Pha 1: App + DB + pgAdmin)
+# ============================================================
+# Khởi chạy:  docker compose up -d --build
+# Dừng:       docker compose down
+# Xóa data:   docker compose down -v
+# ============================================================
+
+services:
+  # ── CRM Application ──────────────────────────────────────
+  app:
+    build: ./app
+    container_name: crm-app
+    restart: unless-stopped
+    environment:
+      - APP_PORT=${APP_PORT:-3000}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-crm_db}
+      - POSTGRES_USER=${POSTGRES_USER:-crm_app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    # Trong Pha 2 sẽ bỏ ports này — truy cập qua Nginx
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+
+  # ── PostgreSQL Database ──────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: crm-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-crm_db}
+      - POSTGRES_USER=${POSTGRES_USER:-crm_app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./database/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-crm_app} -d $${POSTGRES_DB:-crm_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # DB KHÔNG publish port ra host — chỉ internal
+    networks:
+      - data
+
+  # ── pgAdmin — quản trị PostgreSQL ───────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: crm-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@example.test}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD is required}
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - data
+
+# ── Networks ───────────────────────────────────────────────
+networks:
+  edge:
+    driver: bridge
+  data:
+    driver: bridge
+  monitoring:
+    driver: bridge
+
+# ── Volumes ────────────────────────────────────────────────
+volumes:
+  postgres_data:
