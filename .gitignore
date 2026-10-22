@@ -1,0 +1,32 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+coverage/
+dist/
+
+# Docker/database and observability data
+postgres-data/
+pgdata/
+grafana-data/
+prometheus-data/
+loki-data/
+*.log
+
+# Local TLS private keys and generated certificates
+*.key
+*.pem
+nginx/certs/
+!nginx/certs/.gitkeep
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
