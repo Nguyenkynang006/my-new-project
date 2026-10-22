@@ -22,7 +22,7 @@ loki-data/
 # Local TLS private keys and generated certificates
 *.key
 *.pem
-nginx/certs/
+nginx/certs/*
 !nginx/certs/.gitkeep
 
 # Backup directories
