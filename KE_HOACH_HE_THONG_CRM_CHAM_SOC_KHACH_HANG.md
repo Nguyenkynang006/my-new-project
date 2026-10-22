@@ -150,9 +150,10 @@ Biến môi trường dự kiến:
 
 ```env
 POSTGRES_DB=crm_db
-POSTGRES_USER=crm_app
-POSTGRES_PASSWORD=replace_with_strong_password
-POSTGRES_ADMIN_PASSWORD=replace_with_strong_password
+POSTGRES_USER=crm_admin
+POSTGRES_PASSWORD=replace_with_strong_admin_password
+CRM_APP_USER=crm_app
+CRM_APP_PASSWORD=replace_with_strong_app_password
 APP_PORT=3000
 PGADMIN_DEFAULT_EMAIL=admin@example.test
 PGADMIN_DEFAULT_PASSWORD=replace_with_strong_password

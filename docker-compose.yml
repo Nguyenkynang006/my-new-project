@@ -1,223 +1,54 @@
-version: "3.8"
-
-# ============================================================
-# CRM Customer Care — Docker Compose
-# ============================================================
-# Khởi chạy:  docker compose up -d --build
-# Dừng:       docker compose down
-# Xóa data:   docker compose down -v
-# ============================================================
-
 services:
-  # ── Nginx Reverse Proxy & SSL Termination ─────────────────
-  nginx:
-    build: ./nginx
-    container_name: crm-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - nginx_certs:/etc/nginx/certs
-    depends_on:
-      app:
-        condition: service_healthy
-    networks:
-      - edge
-      - monitoring
-
-  # ── CRM Application ──────────────────────────────────────
-  app:
-    build: ./app
-    container_name: crm-app
-    restart: unless-stopped
-    environment:
-      - APP_PORT=3000
-      - DB_HOST=db
-      - DB_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-crm_db}
-      - POSTGRES_USER=${POSTGRES_USER:-crm_app}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    # Bảo mật: Cổng app không expose trực tiếp ra ngoài — chỉ truy cập qua Nginx
-    expose:
-      - "3000"
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - edge
-      - data
-
-  # ── PostgreSQL Database ──────────────────────────────────
   db:
     image: postgres:16-alpine
-    container_name: crm-db
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-crm_db}
-      - POSTGRES_USER=${POSTGRES_USER:-crm_app}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-crm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      CRM_APP_USER: ${CRM_APP_USER:-crm_app}
+      CRM_APP_PASSWORD: ${CRM_APP_PASSWORD:?set CRM_APP_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./database/sample-data.sql:/docker-entrypoint-initdb.d/02-sample-data.sql:ro
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks: [data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-crm_app} -d $${POSTGRES_DB:-crm_db}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build: ./app
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-crm_db}
+      DB_USER: ${CRM_APP_USER:-crm_app}
+      DB_PASSWORD: ${CRM_APP_PASSWORD:?set CRM_APP_PASSWORD in .env}
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [edge, data]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
-    # Bảo mật: DB KHÔNG publish port ra host — chỉ internal
-    networks:
-      - data
-
-  # ── pgAdmin — quản trị PostgreSQL ───────────────────────
   pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: crm-pgadmin
+    image: dpage/pgadmin4:8
     restart: unless-stopped
     environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@example.test}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD is required}
-    ports:
-      - "5050:80"
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set PGADMIN_DEFAULT_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set PGADMIN_DEFAULT_PASSWORD in .env}
+      PGADMIN_LISTEN_PORT: 80
+    ports: ["127.0.0.1:5050:80"]
+    networks: [data]
     depends_on:
-      - db
-    networks:
-      - data
-
-  # ── Prometheus Server ────────────────────────────────────
-  prometheus:
-    image: prom/prometheus:v2.51.0
-    container_name: crm-prometheus
-    restart: unless-stopped
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--web.enable-lifecycle"
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - monitoring
-      - edge
-      - data
-
-  # ── Grafana Dashboard ────────────────────────────────────
-  grafana:
-    image: grafana/grafana:10.4.0
-    container_name: crm-grafana
-    restart: unless-stopped
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - monitoring
-
-  # ── PostgreSQL Exporter ──────────────────────────────────
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:v0.15.0
-    container_name: crm-postgres-exporter
-    restart: unless-stopped
-    environment:
-      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-crm_app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-crm_db}?sslmode=disable
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - data
-      - monitoring
-
-  # ── Nginx Prometheus Exporter ────────────────────────────
-  nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:1.1.0
-    container_name: crm-nginx-exporter
-    restart: unless-stopped
-    command:
-      - "-nginx.scrape-uri=http://nginx:8080/stub_status"
-    depends_on:
-      - nginx
-    networks:
-      - edge
-      - monitoring
-
-  # ── cAdvisor (Container Monitoring) ──────────────────────
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: crm-cadvisor
-    restart: unless-stopped
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    networks:
-      - monitoring
-
-  # ── Loki — Lưu trữ Log Tập trung ──────────────────────────
-  loki:
-    image: grafana/loki:2.9.8
-    container_name: crm-loki
-    restart: unless-stopped
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./logging/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-    networks:
-      - monitoring
-
-  # ── Promtail — Thu thập Log Docker Containers ────────────
-  promtail:
-    image: grafana/promtail:2.9.8
-    container_name: crm-promtail
-    restart: unless-stopped
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - ./logging/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    depends_on:
-      - loki
-    networks:
-      - monitoring
-
-# ── Networks ───────────────────────────────────────────────
+      db: { condition: service_healthy }
 networks:
-  edge:
-    driver: bridge
-  data:
-    driver: bridge
-  monitoring:
-    driver: bridge
-
-# ── Volumes ────────────────────────────────────────────────
+  edge: {}
+  data: { internal: true }
 volumes:
-  postgres_data:
-  nginx_certs:
-  prometheus_data:
-  grafana_data:
-  loki_data:
-
-
-
+  postgres_data: {}

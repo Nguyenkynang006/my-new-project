@@ -1,23 +1,11 @@
-FROM node:20-alpine
-
+FROM node:22-alpine
+ENV NODE_ENV=production
 WORKDIR /app
-
-# Install production dependencies
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production || npm install --only=production
-
-# Copy application source
-COPY src/ ./src/
-
-# Create non-root user for security hardening
-RUN addgroup -g 1001 -S appgroup && \
-    adduser  -u 1001 -S appuser -G appgroup
-
-USER appuser
-
+COPY package.json ./
+RUN npm install --omit=dev && addgroup -S app && adduser -S app -G app
+COPY --chown=app:app src/ ./src/
+USER app
 EXPOSE 3000
-
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
 CMD ["node", "src/server.js"]
