@@ -21,6 +21,7 @@ router.post('/:customerId/contacts', contactRules, async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       const customer = await customerService.getById(req.params.customerId);
+      if (!customer) { const e = new Error('Not found'); e.status = 404; return next(e); }
       return res.status(422).render('contacts/form', {
         title:      'Thêm liên hệ',
         active:     'customers',

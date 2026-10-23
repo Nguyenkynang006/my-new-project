@@ -78,7 +78,8 @@ const customerService = {
     const { name, company_name, industry, email, phone, address, status } = data;
     const res = await pool.query(
       `UPDATE customers
-       SET name=$1, company_name=$2, industry=$3, email=$4, phone=$5, address=$6, status=$7
+       SET name=$1, company_name=$2, industry=$3, email=$4, phone=$5, address=$6, status=$7,
+           updated_at = NOW()
        WHERE id=$8 AND deleted_at IS NULL RETURNING *`,
       [name, company_name || null, industry || null, email || null, phone || null, address || null, status, id]
     );

@@ -43,10 +43,13 @@ const interactionService = {
   /** Tạo tương tác mới. */
   async create(data) {
     const { customer_id, contact_id, type, subject, notes, occurred_at } = data;
+    // occurred_at từ form là "YYYY-MM-DDTHH:MM" (không timezone).
+    // Nếu trống → để DB dùng DEFAULT now(). Nếu có → dùng giá trị truyền vào.
+    const resolvedAt = occurred_at && occurred_at.trim() ? new Date(occurred_at) : new Date();
     const res = await pool.query(
       `INSERT INTO interactions (customer_id, contact_id, type, subject, notes, occurred_at)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [customer_id, contact_id || null, type, subject, notes || null, occurred_at || new Date()]
+      [customer_id, contact_id || null, type, subject, notes || null, resolvedAt]
     );
     logger.info('interaction_created', {
       interaction_id: res.rows[0].id,

@@ -21,22 +21,32 @@ const contactService = {
   /** Tạo liên hệ mới. */
   async create(data) {
     const { customer_id, first_name, last_name, job_title, email, phone, is_primary } = data;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Nếu đặt làm liên hệ chính thì bỏ is_primary ở các liên hệ cũ
-    if (is_primary) {
-      await pool.query(
-        'UPDATE contacts SET is_primary = FALSE WHERE customer_id = $1',
-        [customer_id]
+      // Nếu đặt làm liên hệ chính thì bỏ is_primary ở các liên hệ cũ (trong transaction)
+      if (is_primary) {
+        await client.query(
+          'UPDATE contacts SET is_primary = FALSE WHERE customer_id = $1',
+          [customer_id]
+        );
+      }
+
+      const res = await client.query(
+        `INSERT INTO contacts (customer_id, first_name, last_name, job_title, email, phone, is_primary)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        [customer_id, first_name, last_name, job_title || null, email || null, phone || null, is_primary ? true : false]
       );
+      await client.query('COMMIT');
+      logger.info('contact_created', { contact_id: res.rows[0].id, customer_id });
+      return res.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-
-    const res = await pool.query(
-      `INSERT INTO contacts (customer_id, first_name, last_name, job_title, email, phone, is_primary)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [customer_id, first_name, last_name, job_title || null, email || null, phone || null, is_primary ? true : false]
-    );
-    logger.info('contact_created', { contact_id: res.rows[0].id, customer_id });
-    return res.rows[0];
   },
 
   /** Cập nhật liên hệ. */
