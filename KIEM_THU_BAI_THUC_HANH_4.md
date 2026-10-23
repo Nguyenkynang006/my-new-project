@@ -22,7 +22,8 @@
 - Ubuntu Server 20.04/22.04, đã cài Docker Engine ≥ 24 và Docker Compose Plugin ≥ 2.20.
 - Đứng tại thư mục gốc dự án (nơi có `docker-compose.yml`), đã có file `.env`.
 - Cổng host trống: `80`, `443` (nginx), `3001` (Grafana), `9090` (Prometheus), `5050` (pgAdmin).
-- **Lưu ý quan trọng:** `loki` và `promtail` **không publish port ra host**. Do đó để gọi trực tiếp Loki phải dùng `docker compose exec -T promtail wget ...` (xa hơn: `loki:3100` chỉ truy cập được trong mạng `monitoring`).
+- **Lưu ý quan trọng:** `loki` và `promtail` **không publish port ra host**. Để gọi trực tiếp Loki, dùng container `app` (image node:alpine có `wget`, nằm trong mạng `monitoring`): `docker compose exec -T app wget -qO- http://loki:3100/ready`. **Không dùng `promtail`** vì image này không có `wget`.
+- **Đồng bộ DB cũ:** service `db-migrate` sẽ tự chạy migration mỗi lần `docker compose up` (idempotent, không xoá dữ liệu) — xem mục 9.
 
 ---
 
@@ -37,10 +38,12 @@ ls -l logging/loki/loki-config.yml logging/promtail/promtail-config.yml
 
 # 3.3 Promtail phải dùng label Compose để gán service (không phụ thuộc tên project)
 grep -n "com_docker_compose_service" logging/promtail/promtail-config.yml
-# Kỳ vọng: 2 dòng (rule keep + rule gán nhãn service)
 
 # 3.4 Promtail phải có endpoint push đúng Loki
 grep -n "loki:3100/loki/api/v1/push" logging/promtail/promtail-config.yml
+
+# 3.5 Relabel phải idempotent: keep dựa trên nhãn `service` (không dựa __meta_*)
+grep -n "source_labels: \['service'\]" logging/promtail/promtail-config.yml
 ```
 
 **Kỳ vọng:** tất cả lệnh trả về 0 và in ra đúng nội dung.
@@ -51,24 +54,26 @@ grep -n "loki:3100/loki/api/v1/push" logging/promtail/promtail-config.yml
 
 > **Vì sao tối ưu:** chỉ cần **2 request HTTP** là phủ đủ 3 truy vấn bắt buộc; hoàn toàn xác định (deterministic), không phá dữ liệu, chạy lại được nhiều lần, và tạo minh chứng ảnh chụp cho báo cáo.
 
-### Bước 0 — Khởi động sạch
+### Bước 0 — Khởi động
 
 ```bash
 docker compose up -d --build
 docker compose ps
-# Kỳ vọng: 11 service đều ở trạng thái Up / healthy
+# Kỳ vọng: 11 service thường trực Up/healthy + job db-migrate chạy xong (exit 0)
+# Nếu grafana chỉ hiện 3000/tcp (thiếu 3001): docker compose up -d --force-recreate grafana
 ```
 
 ### Bước 1 — Kiểm tra sức khoẻ pipeline
 
 ```bash
-# Loki sẵn sàng (chạy từ trong container promtail trên mạng monitoring)
-docker compose exec -T promtail wget -qO- http://loki:3100/ready
+# Loki sẵn sàng — gọi từ container app (có wget, cùng mạng monitoring).
+# KHÔNG dùng promtail vì image promtail không có wget.
+docker compose exec -T app wget -qO- http://loki:3100/ready
 # Kỳ vọng: ready
 
 # Promtail không có lỗi cấu hình
 docker compose logs promtail | tail -20
-# Kỳ vọng: không có dòng level=error / panic
+# Kỳ vọng: không có dòng level=error / panic / 400
 ```
 
 ### Bước 2 — Sinh log (2 request)
@@ -127,8 +132,8 @@ rate({service="app"}[1m])
 ### Bước 6 — Thu thập minh chứng
 
 Chụp màn hình cho báo cáo:
-- `docker compose ps` (đủ 11 container Up).
-- `docker compose exec -T promtail wget -qO- http://loki:3100/ready` → `ready`.
+- `docker compose ps` (11 service thường trực + db-migrate `Exited (0)`).
+- `docker compose exec -T app wget -qO- http://loki:3100/ready` → `ready`.
 - Grafana Explore với **từng truy vấn 1, 2, 3** (có thời gian + kết quả log).
 
 ---
@@ -138,9 +143,10 @@ Chụp màn hình cho báo cáo:
 | ID | Tên | Tiền điều kiện | Bước thực hiện | Kỳ vọng |
 |---|---|---|---|---|
 | TC-00 | Môi trường hợp lệ | Có Docker | `docker compose config --quiet` | exit 0 |
-| TC-01 | Stack khởi động | — | `docker compose up -d --build` rồi `docker compose ps` | 11 service Up, `app` healthy |
-| TC-02 | Loki sẵn sàng | TC-01 | `docker compose exec -T promtail wget -qO- http://loki:3100/ready` | In ra `ready` |
-| TC-03 | Promtail không lỗi | TC-01 | `docker compose logs promtail` | Không có `level=error`/`panic` |
+| TC-01 | Stack khởi động | — | `docker compose up -d --build` rồi `docker compose ps` | 11 service thường trực Up, `app` healthy |
+| TC-01b | Migration DB tự động | TC-01 | `docker inspect -f '{{.State.ExitCode}}' "$(docker compose ps -a -q db-migrate)"` | Exit code `0` |
+| TC-02 | Loki sẵn sàng | TC-01 | `docker compose exec -T app wget -qO- http://loki:3100/ready` | In ra `ready` |
+| TC-03 | Promtail không lỗi | TC-01 | `docker compose logs promtail` | Không có `level=error`/`panic`/400 |
 | TC-04 | Ghi log nghiệp vụ | TC-01 | POST `/customers` | HTTP 302; Loki có `customer_created` |
 | TC-05 | Ghi log lỗi app | TC-01 | GET `/khong-ton-tai` | HTTP 404; Loki có `unhandled_error` (ERROR) |
 | TC-06 | Log access nginx | TC-01 | GET `/khong-ton-tai` (đã làm ở TC-05) | Loki có log nginx status 404 |
@@ -158,7 +164,7 @@ Chụp màn hình cho báo cáo:
 Bài thực hành 4 **ĐẠT** khi:
 
 - [ ] `loki` và `promtail` chạy, `Loki /ready` trả `ready`.
-- [ ] Promtail không báo lỗi, thu thập được container `app`, `nginx`, `db`.
+- [ ] Promtail không báo lỗi 400; thu thập được container `app`, `nginx`, `db`.
 - [ ] Loki có stream với nhãn `service="app"`, `service="nginx"`, `service="db"`.
 - [ ] **3/3 truy vấn bắt buộc** trả kết quả: `customer_created`, `ERROR`, nginx 4xx/5xx.
 - [ ] Có ảnh chụp Grafana Explore cho 3 truy vấn + ảnh `docker compose ps`.
@@ -170,12 +176,14 @@ Bài thực hành 4 **ĐẠT** khi:
 
 | Triệu chứng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
+| Loki trả 400 "at least one label pair is required per stream" | Rule `keep` dựa vào `__meta_*` bị áp dụng ở lượt relabel thứ 2 (lúc đó `__meta_*` đã mất) → label rỗng | Cấu hình hiện tại đã sửa: gán `service` trước, `keep` theo `service`. Kiểm tra `logging/promtail/promtail-config.yml` |
 | Truy vấn `{service="app"}` rỗng | Promtail không nhận `service` label (sai regex/tên project) | Kiểm tra `logging/promtail/promtail-config.yml` dùng `com.docker.compose.service`; xem `/targets` |
 | Loki nhận 0 log | Promtail không kết nối được Loki | `docker compose logs promtail`; kiểm tra `clients.url` = `http://loki:3100/loki/api/v1/push` |
 | Query `level = "error"` rỗng | Log thực tế ghi `ERROR` (in hoa) | Dùng `level = "ERROR"` hoặc `\|= "ERROR"` |
 | Không thấy log vừa sinh | Chưa hết chu kỳ quét/gửi | Chờ 10–15 giây rồi Run query lại; chỉnh time range "Last 15 minutes" |
 | Explore không có datasource Loki | Provisioning sai path | Kiểm tra `monitoring/grafana/provisioning/datasources/` và `docker compose logs grafana` |
 | Log bị nhân đôi sau restart | Promtail `positions` ở `/tmp` | Chấp nhận với demo; muốn chắc thì mount volume cho file positions |
+| `db-migrate` exit ≠ 0 | Migration lỗi (vd. dữ liệu status lạ) | `docker compose logs db-migrate`; kiểm tra `SELECT DISTINCT status FROM customers;` rồi xử lý giá trị lạ |
 
 ---
 
@@ -188,6 +196,31 @@ bash KIEM_THU_BAI_THUC_HANH_4.sh
 # Nếu image đã build sẵn: SKIP_BUILD=1 bash KIEM_THU_BAI_THUC_HANH_4.sh
 ```
 
-Script sẽ tự: kiểm tra môi trường → khởi động stack → kiểm tra Loki/Promtail → sinh log → chờ → chạy 4 truy vấn qua Loki API → in bảng `PASS/FAIL` và **exit 1 nếu có mục chưa đạt**.
+Script sẽ tự: kiểm tra môi trường → khởi động stack → kiểm tra db-migrate → kiểm tra Loki/Promtail → sinh log → chờ → chạy 4 truy vấn qua Loki API → in bảng `PASS/FAIL` và **exit 1 nếu có mục chưa đạt**. Toàn bộ output được lưu vào `KIEM_THU_BAI4_EVIDENCE_<timestamp>.log` (bằng chứng cho báo cáo).
 
 > Script chỉ đọc/ghi dữ liệu demo (tạo 1 khách hàng, 1 tương tác); chạy lại nhiều lần vẫn an toàn.
+
+---
+
+## 9. Đồng bộ DB cũ (migration) — không xoá volume
+
+**Tự động:** service `db-migrate` chạy một lần mỗi khi `docker compose up` (idempotent) và nạp `database/migrations/*.sql`. `app` và `postgres-exporter` chỉ khởi động sau khi migration xong (`service_completed_successfully`). Kiểm tra:
+
+```bash
+docker compose ps -a | grep db-migrate     # Exited (0)
+docker compose logs db-migrate              # "[db-migrate] done"
+```
+
+**Thủ công (chỉ khi cần chạy riêng):**
+
+```bash
+docker compose exec -T db sh -c \
+  'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v app_user="$CRM_APP_USER"' \
+  < database/migrations/001_sync_schema_and_grants.sql
+```
+
+Migration sẽ (idempotent, không xoá dữ liệu):
+- Cập nhật `CHECK` của `customers.status` từ bộ cũ (`prospect`,`customer`) sang bộ mới (`lead`,`nurturing`,`active`,`inactive`) và map dữ liệu cũ.
+- Thêm `deleted_at` nếu thiếu.
+- `GRANT pg_monitor` (quyền giám sát tối thiểu, **không phải superuser**) cho user ứng dụng để collector WAL của postgres-exporter đọc được `pg_ls_waldir()`.
+- Cấp lại quyền DML/sequence (an toàn khi chạy lại).

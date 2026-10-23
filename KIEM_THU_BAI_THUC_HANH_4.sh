@@ -15,13 +15,20 @@ BASE_URL="${BASE_URL:-http://localhost}"
 LOKI="${LOKI:-http://loki:3100}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 
+# Ghi lai toan bo output lam bang chung cho bao cao
+EVIDENCE_LOG="KIEM_THU_BAI4_EVIDENCE_$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$EVIDENCE_LOG") 2>&1
+
 PASS=0; FAIL=0
 pass() { printf '  \033[32m[PASS]\033[0m %s\n' "$*"; PASS=$((PASS+1)); }
 fail() { printf '  \033[31m[FAIL]\033[0m %s\n' "$*"; FAIL=$((FAIL+1)); }
 head() { printf '\n\033[36m== %s ==\033[0m\n' "$*"; }
 
-# Goi Loki tu trong container promtail (busybox wget co san tren Alpine)
-loki_get() { docker compose exec -T promtail wget -qO- "$1" 2>/dev/null || true; }
+echo "Evidence log: $EVIDENCE_LOG"
+
+# Goi Loki tu container app (node:alpine co busybox wget, va app nam trong mang monitoring).
+# Khong dung promtail vi image promtail khong co wget.
+loki_get() { docker compose exec -T app wget -qO- "$1" 2>/dev/null || true; }
 
 # Kiem tra 1 LogQL (da ma hoa URL) co tra ve log khong; retry toi da ~20s
 check_streams() { # $1=ten, $2=query da encode
@@ -44,14 +51,29 @@ docker compose config --quiet >/dev/null 2>&1 && pass "docker-compose.yml hop le
 
 head "TC-01: Khoi dong stack"
 if [ "$SKIP_BUILD" = "1" ]; then docker compose up -d; else docker compose up -d --build; fi
+# Cho toi khi app healthy (toi da ~180s). app chi chay sau khi db-migrate xong.
 for _ in $(seq 1 60); do
-  n=$(docker compose ps --format '{{.Service}}' | wc -l | tr -d ' ')
-  [ "$n" -ge 11 ] && break
+  h=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app 2>/dev/null)" 2>/dev/null || echo none)
+  [ "$h" = "healthy" ] && break
   sleep 3
 done
 n=$(docker compose ps --format '{{.Service}}' | wc -l | tr -d ' ')
-[ "$n" -ge 11 ] && pass "11/11 service dang chay" || fail "chi $n/11 service chay"
+[ "$n" -ge 11 ] && pass "11/11 service thuong truc dang chay" || fail "chi $n/11 service chay"
 docker compose ps --format 'table {{.Service}}\t{{.Status}}'
+
+head "TC-01b: Migration DB tu dong (db-migrate)"
+cid=$(docker compose ps -a -q db-migrate 2>/dev/null || true)
+if [ -n "$cid" ]; then
+  code=$(docker inspect -f '{{.State.ExitCode}}' "$cid" 2>/dev/null || echo none)
+  if [ "$code" = "0" ]; then
+    pass "db-migrate exit 0"
+  else
+    fail "db-migrate exit ${code}"
+    docker compose logs db-migrate --tail 30 || true
+  fi
+else
+  fail "khong tim thay container db-migrate"
+fi
 
 app_health=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)" 2>/dev/null || echo none)
 case "$app_health" in
@@ -64,7 +86,7 @@ out=$(loki_get "${LOKI}/ready")
 printf '%s' "$out" | grep -qx "ready" && pass "GET /ready -> ready" || fail "Loki /ready: ${out:-<empty>}"
 
 head "TC-03: Promtail khong loi"
-if docker compose logs promtail 2>&1 | grep -qiE 'level=error|panic|failed to'; then
+if docker compose logs promtail 2>&1 | grep -qiE 'level=error|panic|failed to|at least one label pair'; then
   fail "Promtail co loi trong log"
   docker compose logs promtail --tail 20
 else
@@ -98,6 +120,7 @@ printf '%s' "$out" | grep -q '"service":"nginx"' && pass "stream co nhan service
 
 head "TONG KET"
 echo "PASS=$PASS  FAIL=$FAIL"
+echo "Bang chung da luu: $EVIDENCE_LOG"
 if [ "$FAIL" -eq 0 ]; then
   printf '\033[32m==> BAI THUC HANH 4: DAT ==\033[0m\n'
 else

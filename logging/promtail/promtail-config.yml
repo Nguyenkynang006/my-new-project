@@ -22,26 +22,29 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Chỉ thu thập log của các service CRM (app/nginx/db).
-      # Dùng label com.docker.compose.service do Docker Compose tự đặt nên
-      # KHÔNG phụ thuộc tên thư mục/project: nếu repo được đặt tên khác
-      # (vd "MSSV-crm-customer-care"), tên container không còn bắt đầu bằng
-      # "crm-" và các rule dựa trên tên container sẽ không gán được nhãn service.
+      # Promtail áp dụng relabel HAI lần: lần đầu khi tạo target (còn __meta_*),
+      # lần sau khi xử lý từng dòng log (đã mất __meta_*). Vì vậy mọi rule phải
+      # idempotent: gán nhãn trước, rồi lọc theo nhãn đã gán (không lọc bằng
+      # __meta_* ở bước keep, nếu không lượt relabel thứ 2 tạo label rỗng
+      # → Loki trả 400 "at least one label pair is required per stream").
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        regex: '(.+)'
+        target_label: 'service'
+        replacement: '$1'
+
+      # Lọc theo nhãn `service` đã tạo (idempotent qua 2 lượt relabel)
+      - source_labels: ['service']
         regex: '^(app|nginx|db)$'
         action: keep
 
-      # Gán nhãn service theo đúng service name trong docker-compose
-      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        target_label: 'service'
-
-      # Gán nhãn tên container (bỏ ký tự "/" ở đầu)
+      # Nhãn container: regex yêu cầu >=1 ký tự để lượt relabel thứ 2 (không còn
+      # __meta_docker_container_name) không xoá mất nhãn đã có.
       - source_labels: ['__meta_docker_container_name']
-        regex: '/?(.*)'
+        regex: '/?([^/]+)'
         target_label: 'container'
         replacement: '$1'
 
-      # Nhãn ổn định cho query/group-by
+      # Nhãn tĩnh — bảo đảm stream luôn có ít nhất 1 label
       - target_label: 'job'
         replacement: 'crm-docker'
       - target_label: 'environment'

@@ -1,0 +1,257 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue}
+\setstretch{1.25}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{3pt}
+\setlength{\emergencystretch}{3em}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Báo cáo thực hành — Hệ thống CRM}
+\fancyhead[R]{Triển khai và Quản trị Hệ thống Phần mềm}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\titleformat{\chapter}[hang]{\bfseries\Large}{\thechapter.}{0.6em}{}
+\setlist[itemize]{leftmargin=1.2cm}
+\setlist[enumerate]{leftmargin=1.2cm}
+\newcommand{\evidence}[2]{\begin{figure}[H]\centering\IfFileExists{#1}{\includegraphics[width=\linewidth,height=0.34\textheight,keepaspectratio]{#1}}{\fbox{\parbox{0.9\linewidth}{Không tìm thấy ảnh tại đường dẫn minh chứng: \texttt{#1}. Cần chèn lại ảnh gốc trước khi nộp.}}}\caption{#2}\end{figure}}
+\newcommand{\fillline}[1]{\underline{\hspace{#1}}}
+\begin{document}
+\begin{titlepage}
+\centering
+{\large \textbf{TRƯỜNG: \fillline{7cm}}}\\[0.4cm]
+{\large \textbf{KHOA: \fillline{7.8cm}}}\\[2.0cm]
+{\Large \textbf{BÁO CÁO THỰC HÀNH}}\\[0.5cm]
+{\large MÔN: TRIỂN KHAI VÀ QUẢN TRỊ HỆ THỐNG PHẦN MỀM}\\[1.5cm]
+{\LARGE\bfseries TRIỂN KHAI HỆ THỐNG CRM\\CHĂM SÓC KHÁCH HÀNG}\\[0.4cm]
+{\large Docker Compose — PostgreSQL — Nginx — Prometheus — Grafana — Loki}\\[1.8cm]
+\begin{flushleft}
+\textbf{Sinh viên:} \fillline{10cm}\\[0.45cm]
+\textbf{Mã số sinh viên:} \fillline{8.7cm}\\[0.45cm]
+\textbf{Lớp:} \fillline{11.3cm}\\[0.45cm]
+\textbf{Giảng viên hướng dẫn:} \fillline{7.6cm}\\[0.45cm]
+\textbf{Repository GitHub:} \fillline{7.3cm}
+\end{flushleft}
+\vfill
+{\large \textbf{TP. \fillline{3cm}, năm 2026}}
+\end{titlepage}
+
+\pagenumbering{roman}
+\chapter*{Lời cam đoan}
+Tôi cam đoan báo cáo này mô tả trung thực cấu hình, quá trình triển khai và kết quả kiểm thử của hệ thống CRM trong phạm vi các ảnh chụp màn hình đã thu thập. Những phần chưa kiểm chứng hoặc đang có lỗi được ghi rõ trong báo cáo, không được trình bày như kết quả đã hoàn tất. Các thông tin cá nhân, tên trường, lớp và địa chỉ repository cần được sinh viên điền trước khi nộp.\\[1cm]
+\begin{flushright}
+Sinh viên thực hiện\\[1.5cm]
+\fillline{5cm}
+\end{flushright}
+
+\chapter*{Lời cảm ơn}
+Em xin cảm ơn giảng viên phụ trách môn học đã cung cấp yêu cầu và tiêu chí đánh giá để em thực hành triển khai, vận hành và giám sát một hệ thống phần mềm theo hướng dịch vụ. Báo cáo được xây dựng từ cấu hình CRM và các ảnh kiểm thử thực tế của stack Docker Compose. Em mong nhận được góp ý để tiếp tục hoàn thiện cấu hình, kiểm thử và kỹ năng quản trị hệ thống.
+
+\chapter*{Tóm tắt}
+Đề tài triển khai một ứng dụng CRM quản lý khách hàng, thông tin liên hệ và lịch sử tương tác. Hệ thống chạy bằng Docker Compose trên môi trường Ubuntu, dùng Node.js cho ứng dụng, PostgreSQL làm cơ sở dữ liệu, pgAdmin để quản trị, Nginx làm reverse proxy và các thành phần quan sát gồm Prometheus, Grafana, cAdvisor, nginx-prometheus-exporter, postgres-exporter, Loki và Promtail. Bộ kiểm thử xác nhận các trang CRM chính, thao tác tạo/sửa/xóa liên hệ và tương tác, trạng thái PostgreSQL, một số chỉ số Prometheus, health check, cùng một số biện pháp hardening. Kết quả cũng ghi nhận lỗi tạo khách hàng trả HTTP 500, Promtail bị Loki từ chối stream do thiếu nhãn, cAdvisor chưa cung cấp số liệu container theo nhãn Compose, cảnh báo quyền WAL của PostgreSQL exporter và việc chưa xác nhận truy cập Grafana từ host. Vì vậy báo cáo phân biệt rõ phần đạt, phần đạt một phần và phần cần sửa tiếp.
+
+\chapter*{Danh mục từ viết tắt}
+\begin{longtable}{p{3cm}p{11cm}}
+CRM & Customer Relationship Management — quản lý quan hệ khách hàng\\
+DB & Database — cơ sở dữ liệu\\
+HTTP/HTTPS & Giao thức truyền tải web / phiên bản mã hóa TLS\\
+TLS & Transport Layer Security\\
+Reverse proxy & Máy chủ trung gian nhận yêu cầu và chuyển tới dịch vụ phía sau\\
+Metrics & Số liệu dạng chuỗi thời gian dùng để giám sát\\
+LogQL & Ngôn ngữ truy vấn log của Grafana Loki\\
+UID/GID & Định danh người dùng/nhóm trên hệ điều hành Linux\\
+\end{longtable}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\chapter{Giới thiệu đề tài}
+\section{Bối cảnh}
+Trong hoạt động chăm sóc khách hàng, thông tin khách hàng, người liên hệ và lịch sử trao đổi cần được lưu trữ có cấu trúc, dễ tra cứu và được bảo vệ. Một ứng dụng CRM nhỏ là tình huống phù hợp để thực hành kết nối ứng dụng với PostgreSQL, xuất bản dịch vụ qua reverse proxy, quản lý cấu hình bằng mã nguồn và theo dõi trạng thái hệ thống.
+\section{Mục tiêu}
+Mục tiêu là đóng gói toàn bộ thành phần bằng Docker Compose; cung cấp luồng truy cập qua Nginx; quản lý dữ liệu bằng PostgreSQL và pgAdmin; cấu hình thu thập metrics với Prometheus/Grafana; tập trung log bằng Loki/Promtail; áp dụng các nguyên tắc hardening; và kiểm chứng luồng nghiệp vụ bằng lệnh HTTP, truy vấn DB, log và ảnh chụp.
+\section{Phạm vi và giả định}
+Báo cáo mô tả stack mang tên dự án \texttt{my-new-project}, được chạy trên Ubuntu trong thư mục \texttt{\textasciitilde/projects/my-new-project}. Các ảnh là bằng chứng của một phiên kiểm thử vào ngày 23/10/2026. Báo cáo không suy đoán tên trường, sinh viên, mã số, lớp hoặc URL GitHub. Không có bằng chứng về ba commit cụ thể trong ảnh; yêu cầu commit vì thế được nêu thành mục cần bổ sung minh chứng Git trước khi nộp.
+
+\chapter{Kiến trúc hệ thống}
+\section{Các thành phần}
+Ứng dụng Node.js phục vụ giao diện CRM và endpoint sức khỏe, kết nối tới PostgreSQL trên mạng nội bộ Compose. Nginx công bố HTTP/HTTPS trên loopback máy chủ và chuyển tiếp yêu cầu tới ứng dụng. pgAdmin cung cấp giao diện DB. Prometheus scrape ứng dụng và exporters. Grafana được provision với datasource Loki và dashboard. Loki lưu log; Promtail đọc log container và gửi stream tới Loki. cAdvisor thu thập thông tin container, còn exporters cung cấp metrics cho Nginx và PostgreSQL.
+\section{Luồng yêu cầu và dữ liệu}
+Người dùng gửi yêu cầu vào cổng Nginx đã bind ở \texttt{127.0.0.1:80} và \texttt{127.0.0.1:443}. Nginx chuyển tiếp tới app; app đọc/ghi PostgreSQL. Khi thao tác nghiệp vụ thành công, app ghi log JSON. Prometheus định kỳ lấy metrics từ app/exporters. Promtail đọc log và đẩy đến Loki; Grafana là giao diện truy vấn/hiển thị. Các cổng của DB không được công bố ra host theo kết quả inspect trong ảnh.
+\section{Sơ đồ logic}
+\begin{center}
+\fbox{\begin{minipage}{0.92\linewidth}\centering
+Trình duyệt / curl $\rightarrow$ Nginx (80/443) $\rightarrow$ Node.js CRM $\leftrightarrow$ PostgreSQL\\[4pt]
+\hspace{1cm}pgAdmin $\rightarrow$ PostgreSQL \qquad Prometheus $\leftarrow$ app, Nginx exporter, PostgreSQL exporter, cAdvisor\\[4pt]
+Promtail $\rightarrow$ Loki $\leftrightarrow$ Grafana
+\end{minipage}}
+\end{center}
+Sơ đồ trên là mô hình logic tóm tắt theo các dịch vụ nhìn thấy trong \texttt{docker compose ps}; địa chỉ, tên network và chi tiết cấu hình cần đối chiếu với repository khi hoàn thiện bản nộp.
+
+\chapter{Môi trường và triển khai bằng Docker Compose}
+\section{Môi trường kiểm thử}
+Stack được thao tác trong Ubuntu shell, dùng Docker Compose. Danh sách container ghi nhận 11 dịch vụ: app, cadvisor, db, grafana, loki, nginx, nginx-exporter, pgadmin, postgres-exporter, prometheus và promtail. Ảnh \texttt{docker compose ps} cho thấy app, db, nginx healthy; các dịch vụ quan sát còn lại ở trạng thái Up tại thời điểm chụp. \texttt{docker compose config --quiet} được ghi nhận là \texttt{compose OK}.
+\section{Quản lý mã nguồn}
+Dự án nằm trong \texttt{~/projects/my-new-project} và ảnh kiểm thử cho thấy có thao tác Git pull trên nhánh main. Tệp \texttt{.env} được loại khỏi Git: \texttt{git check-ignore -v .env} chỉ ra quy tắc trong \texttt{.gitignore}; truy vấn danh sách file theo đuôi .env, .key, .pem không trả về file được theo dõi. Tuy nhiên ảnh hiện có chưa chứng minh đủ ba commit được yêu cầu. Cần thêm ảnh \texttt{git log --oneline --decorate -5} và URL repository vào bản nộp.
+\section{Trình tự chạy đề xuất}
+Từ thư mục dự án, kiểm tra cấu hình trước khi chạy: \texttt{docker compose config --quiet}; sau đó build và khởi chạy các dịch vụ bằng \texttt{docker compose up -d --build}; kiểm tra \texttt{docker compose ps}; xem log bằng \texttt{docker compose logs --tail=100 <service>}. Đây là hướng dẫn vận hành tổng quát; người nộp cần xác nhận lại tên file Compose và biến môi trường theo README thật của repository.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-46095813-5306-4d69-bb56-59d59fceb259.png}{Các container trong stack CRM ở thời điểm kiểm thử.}
+
+\chapter{Ứng dụng CRM và cơ sở dữ liệu}
+\section{Nghiệp vụ}
+Ứng dụng có các màn hình danh sách và chi tiết khách hàng, tạo khách hàng, chỉnh sửa khách hàng, quản lý liên hệ và lịch sử tương tác. Các ảnh curl xác nhận HTTP 200 cho \texttt{/customers}, \texttt{/customers/1}, \texttt{/customers/new}, \texttt{/customers/1/edit}, \texttt{/customers/1/contacts/new} và \texttt{/customers/1/contacts/2/edit}. Thao tác liên hệ tạo/sửa/xóa và tương tác tạo/xóa có phản hồi chuyển hướng 302 và được đối chiếu bằng dữ liệu DB.
+\section{PostgreSQL và pgAdmin}
+PostgreSQL là DB chính. \texttt{docker inspect} cho thấy \texttt{5432/tcp:null}, tức cổng DB không được publish ra host trong cấu hình đang chạy; đây là lựa chọn giảm bề mặt truy cập. Tiến trình PostgreSQL chạy UID 70 theo ảnh \texttt{docker compose top}. pgAdmin có trong stack, nhưng ảnh kiểm thử hiện có chưa chứng minh truy cập giao diện pgAdmin hoặc đăng nhập thành công; phần demo giao diện cần bổ sung.
+\section{Kết quả kiểm thử CRUD}
+Liên hệ mới với tên “Kiem Thu” và email thử nghiệm được tạo, sau đó cập nhật họ thành “Thu Da Sua”; truy vấn DB cho thấy thay đổi. Xóa liên hệ trả 302 và truy vấn sau đó cho kết quả không còn dòng tương ứng. Lịch sử tương tác loại \texttt{call} được tạo cho khách hàng 1; xóa trả 302 và truy vấn DB xác nhận bản ghi bị xóa. Ngược lại, POST \texttt{/customers} trả HTTP 500; lỗi này là lỗi chức năng đang mở và chưa có nguyên nhân gốc được chứng minh. Do đó không kết luận chức năng tạo khách hàng hoạt động.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-429a7934-9497-4654-bc9d-a75caa9b55d4.png}{Bằng chứng truy vấn DB sau khi tạo liên hệ.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-8e8f1fce-8af8-4a23-898f-320582a75450.png}{Bằng chứng cập nhật thông tin liên hệ trong DB.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-2ffa18ed-b548-4433-857f-a0349c8b66b6.png}{Log nghiệp vụ ghi nhận contact\_created và interaction\_created.}
+
+\chapter{Nginx reverse proxy}
+\section{Cấu hình và truy cập}
+Nginx là điểm vào HTTP/HTTPS và chuyển tiếp request tới ứng dụng. Ảnh container cho thấy cổng 80 và 443 bind vào loopback \texttt{127.0.0.1}; Nginx exporter nghe cổng 9113 trong nội bộ. Nginx access log và error log lần lượt liên kết tới stdout/stderr, thuận tiện thu thập qua Docker logging.
+\section{Kiểm tra tuyến}
+Yêu cầu trang chủ trả HTTP 200. Endpoint \texttt{/health} trả 200 khi DB kết nối; đường dẫn không tồn tại \texttt{/khong-ton-tai} trả 404. Access log ghi lại các yêu cầu CRM và lỗi. Ảnh thể hiện thông báo tạo chứng thư tự ký thành công, nhưng bộ ảnh không chứng minh một phiên HTTPS được trình duyệt/curl xác thực; báo cáo chỉ xác nhận reverse proxy/headers và việc có bước tạo chứng thư, không khẳng định kiểm thử TLS hoàn tất.
+\section{Sự cố HTTP 500}
+Nginx access log ghi nhận POST \texttt{/customers} trả 500, trong khi app có log \texttt{unhandled\_error} và các truy vấn còn lại trả mã phù hợp. Việc truy cập một URL giả trả 404 là kết quả mong đợi, không phải lỗi triển khai. Cần tách lỗi 500 của thao tác tạo khách hàng khỏi kiểm thử 404 tuyến không tồn tại.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-3a5550fd-3e71-425c-8cfc-9c1c6a496349.png}{Nginx access log có các request thành công, 404 và POST khách hàng 500.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-a36ce425-3cd6-450c-8f17-1d831884d038.png}{Kiểm thử POST tạo khách hàng trả HTTP 500.}
+
+\chapter{Giám sát với Prometheus và Grafana}
+\section{Prometheus}
+Prometheus khởi động, đọc file cấu hình và ghi log sẵn sàng nhận web request. Truy vấn tức thời \texttt{up} cho kết quả 1 đối với các target app, postgres-exporter, cAdvisor, nginx-exporter và chính Prometheus tại thời điểm kiểm tra. Các truy vấn \texttt{pg\_up} và \texttt{nginx\_up} cũng trả 1. Điều đó cho thấy các target được scrape và hai exporter tương ứng phản hồi.
+\section{Chất lượng metrics}
+Mặc dù target cAdvisor ở trạng thái scrape thành công, truy vấn \texttt{container\_last\_seen} cho thấy nhiều cgroup hệ thống; truy vấn đếm container có nhãn Compose trả trống. Nhật ký cAdvisor ghi lỗi không xác định được read-write layer ID trong overlayfs. Vì vậy không có bằng chứng dashboard đã nhận diện đầy đủ metrics theo từng container Compose. PostgreSQL exporter phát cảnh báo \texttt{permission denied for function pg\_ls\_waldir}; \texttt{pg\_up=1} nhưng một collector WAL bị hạn chế. Đây là giám sát một phần, không nên kết luận toàn bộ metrics DB hoàn chỉnh.
+\section{Grafana}
+Log Grafana xác nhận datasource Loki và provision dashboard đã chạy, HTTP server lắng nghe cổng 3000 trong container. Tuy nhiên \texttt{docker compose ps} chỉ hiển thị \texttt{3000/tcp}, không có ánh xạ cổng host như 3001; do vậy ảnh chưa xác nhận có thể mở giao diện Grafana từ máy host theo URL đã dự kiến. Log còn có cảnh báo SQLite database locked và lỗi DNS khi gọi grafana.com để kiểm tra cập nhật/plug-in; các lỗi DNS đó có thể phụ thuộc mạng môi trường.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-06c3799e-7c65-410e-89e1-029718dcb937.png}{Prometheus trả up=1 cho các target quan sát được.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-5498845d-31d1-4429-a701-73389684007a.png}{Truy vấn pg\_up trả về 1.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-23947d92-9f4b-4de7-98f7-36ca215ec8a8.png}{Truy vấn nginx\_up trả về 1.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-3b68c077-c0f8-4ad9-80ee-d4493178fb19.png}{Log cho thấy cAdvisor lỗi overlayfs và PostgreSQL exporter thiếu quyền đọc WAL.}
+
+\chapter{Tập trung log với Loki và Promtail}
+\section{Thiết lập dự kiến}
+Promtail đọc log dịch vụ Docker và gửi tới Loki tại endpoint nội bộ. Loki được cấu hình làm nguồn dữ liệu cho Grafana. Các log ứng dụng ở định dạng JSON có các trường event, method, path, status, duration và timestamp; ví dụ sự kiện \texttt{contact\_created}, \texttt{interaction\_created}, \texttt{health\_check\_failed} và \texttt{unhandled\_error}. Nginx access log được ghi ra stdout nên cũng có thể lấy qua Docker logs.
+\section{Kết quả kiểm thử thực tế}
+Loki đã khởi động sau khi một lỗi cấu hình cũ về trường \texttt{tsdb} được khắc phục. Tuy nhiên Promtail liên tục nhận HTTP 400 với thông báo \texttt{at least one label pair is required per stream}. Vì vậy pipeline thu thập log chưa hoàn tất, và không có bằng chứng truy vấn LogQL thành công trên Loki. Lệnh kiểm tra readiness bằng wget bên trong Promtail không chạy được do image không cài wget; đó là giới hạn của phương pháp kiểm tra, không phải bằng chứng Loki hỏng.
+\section{Các truy vấn LogQL cần chạy sau khi sửa}
+Các câu lệnh dưới đây là truy vấn mục tiêu để demo; chưa được xác nhận chạy thành công trong lần kiểm thử này:
+\begin{enumerate}
+\item \texttt{\{service="app"\} |= "customer\_created"}
+\item \texttt{\{service="app"\} |= "ERROR"}
+\item \texttt{\{service="nginx"\} | regexp " (?P<status>[45][0-9][0-9]) "}
+\end{enumerate}
+Sau khi sửa nhãn stream của Promtail, cần mở Grafana Explore, chọn datasource Loki, chạy từng query với khoảng thời gian có log và chụp ảnh kết quả. Trước khi đó, tiêu chí Loki/LogQL được đánh giá là chưa đạt.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-0ee5d915-c3fe-4fa1-b6e0-7ed2364270e7.png}{Promtail bị Loki từ chối stream vì thiếu cặp nhãn.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-b25daec5-58a9-4d0d-bad8-806dbaa3591e.png}{Log Grafana thể hiện Loki datasource được provision và dashboard được nạp.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-56bab45a-1c81-4438-9af5-1beafafa720a.png}{Prometheus khởi động và nạp cấu hình thành công.}
+
+\chapter{Kế hoạch và kết quả kiểm thử}
+\section{Cách kiểm thử}
+Kiểm thử kết hợp curl qua Nginx, Docker Compose logs/ps/top/inspect, truy vấn Prometheus bằng promtool và truy vấn DB. Mỗi kiểm thử ghi kỳ vọng, quan sát thực tế và trạng thái. Việc lấy log Nginx qua symlink \texttt{/var/log/nginx/access.log -> /dev/stdout} bằng lệnh grep trực tiếp không phù hợp; sử dụng \texttt{docker compose logs nginx} là cách phù hợp hơn. Lệnh readiness sử dụng wget trong Promtail cũng không phù hợp vì image không có wget.
+\begin{longtable}{p{0.8cm}p{4.2cm}p{3.2cm}p{1.4cm}p{4cm}}
+\toprule
+ID & Nội dung & Kết quả quan sát & Trạng thái & Ghi chú\\
+\midrule
+T01 & Compose config & \texttt{compose OK} & Đạt & Cấu hình hợp lệ\\
+T02 & Container services & 11 dịch vụ; app/db/nginx healthy & Đạt & Các dịch vụ khác Up\\
+T03 & Trang CRM chính & Các GET chính trả 200 & Đạt & Đã kiểm tra nhiều tuyến\\
+T04 & Tạo khách hàng & POST trả 500 & Lỗi & Nguyên nhân chưa xác định\\
+T05 & CRUD liên hệ & Tạo/sửa/xóa có redirect; DB đối chiếu đúng & Đạt & Đã kiểm tra bản ghi\\
+T06 & CRUD tương tác & Tạo/xóa có redirect; DB đối chiếu đúng & Đạt & Loại call\\
+T07 & Health khi DB dừng & /health trả 503, log timeout & Đạt & Hành vi lỗi có kiểm soát\\
+T08 & Health khi DB chạy lại & /health trả 200, DB connected & Đạt & Phục hồi thành công\\
+T09 & Prometheus up & app, exporter, Prometheus trả 1 & Đạt một phần & Không chứng minh đầy đủ chất lượng metric\\
+T10 & Metrics cAdvisor/DB & Thiếu nhãn Compose; lỗi pg\_ls\_waldir & Một phần & Sửa quyền/cAdvisor config\\
+T11 & Loki + Promtail & Loki chạy; Promtail HTTP 400 & Lỗi & Chưa chạy LogQL thành công\\
+T12 & Nginx/404 & 404 cho tuyến giả, access log ghi nhận & Đạt & Mã 404 là kỳ vọng\\
+T13 & Hardening & .env bị ignore; app UID100; DB UID70; DB port chưa publish & Đạt một phần & Cần chứng minh network/headers\\
+T14 & Grafana từ host & Chưa thấy port publish 3000 & Chưa xác nhận & Kiểm tra Compose và URL\\
+\bottomrule
+\end{longtable}
+
+\chapter{Hardening và giới hạn bảo mật}
+\section{Biện pháp đã quan sát}
+Ứng dụng chạy với UID 100/GID 101, không phải root. PostgreSQL chạy UID 70. File \texttt{.env} được ignore và không thấy file .env/key/pem trong danh sách Git đã theo dõi. PostgreSQL không publish cổng 5432 ra host. Nginx publish trên loopback thay vì mọi interface. Đây là các biện pháp giảm quyền và giảm bề mặt tấn công có bằng chứng từ ảnh.
+\section{Các điểm cần bổ sung bằng chứng}
+Ảnh \texttt{docker compose top} cho thấy một số tiến trình chạy root, gồm cAdvisor, Promtail, Nginx master và một số tiến trình phụ pgAdmin. Cần đánh giá xem quyền root có thật sự cần thiết; dùng user không đặc quyền khi image hỗ trợ và giới hạn capabilities. Cần xác nhận security headers bằng \texttt{curl -I}, xác nhận network isolation trong \texttt{docker network inspect}, chính sách mật khẩu mạnh và quyền DB tối thiểu trong file Compose/SQL. Không đưa mật khẩu thật hoặc khóa riêng vào báo cáo; che giá trị nhạy cảm trong ảnh.
+\section{Đánh giá}
+Có ít nhất một số biện pháp hardening đang hoạt động, nhưng ảnh chưa đủ để kết luận toàn bộ yêu cầu bảo mật đã hoàn tất. Cần lưu minh chứng header như \texttt{X-Content-Type-Options}, \texttt{X-Frame-Options}, \texttt{Content-Security-Policy}, kiểm tra DB role, cấu hình network nội bộ và danh sách capabilities trước buổi demo.
+
+\chapter{Các lỗi và công việc cần hoàn thiện}
+Các vấn đề dưới đây được tổng hợp trực tiếp từ lần kiểm thử; đây là phần cần xử lý trước khi chụp minh chứng cuối cùng và nộp báo cáo:
+\begin{enumerate}
+\item \textbf{Tạo khách hàng trả HTTP 500.} Nginx ghi POST \texttt{/customers} status 500, ứng dụng có log unhandled error. Cần lấy stack trace đầy đủ, tái hiện với dữ liệu tối thiểu, kiểm tra validate/form/SQL và xác nhận bản ghi được tạo sau khi sửa.
+\item \textbf{Promtail không đẩy được log.} Loki trả HTTP 400 \texttt{at least one label pair is required per stream}. Cần sửa pipeline/labels để mọi stream có tối thiểu một nhãn hợp lệ, khởi động lại, xác nhận log xuất hiện trong Loki và chạy ba truy vấn LogQL.
+\item \textbf{Metrics cAdvisor không gắn nhãn dịch vụ Compose.} Truy vấn đếm \texttt{container\_label\_com\_docker\_compose\_service} rỗng và có lỗi overlayfs. Cần kiểm tra quyền truy cập Docker/cgroup, mount, cấu hình cAdvisor phù hợp môi trường, rồi xác nhận metric container theo từng service.
+\item \textbf{PostgreSQL exporter bị từ chối quyền WAL.} Collector \texttt{pg\_ls\_waldir} báo permission denied. Cần cấp quyền tối thiểu thích hợp cho role exporter hoặc tắt collector không cần thiết, sau đó xác nhận log sạch và metric cần thiết có dữ liệu.
+\item \textbf{Chưa xác nhận truy cập Grafana từ host.} Container lắng nghe 3000 nhưng không có host port hiển thị. Cần kiểm tra yêu cầu demo, cấu hình publish an toàn (ưu tiên loopback), mở URL và chụp dashboard.
+\item \textbf{Cảnh báo SQLite database locked trong Grafana.} Log có thông báo DB bị khóa; cần kiểm tra số instance, volume và quyền ghi, rồi đánh giá còn lặp lại hay không.
+\item \textbf{Thiếu minh chứng LogQL, pgAdmin, HTTPS/security headers, ba commit.} Cần bổ sung ảnh giao diện/kết quả phù hợp và ảnh lịch sử Git. Đây là khoảng trống chứng cứ, không tự động đồng nghĩa tính năng chắc chắn không tồn tại.
+\end{enumerate}
+Thứ tự khuyến nghị: sửa lỗi POST khách hàng; sửa labels Promtail và xác nhận LogQL; hoàn thiện metrics; xác nhận Grafana/pgAdmin; bổ sung kiểm tra header, network, DB privilege và commit; chụp lại các bằng chứng sau sửa.
+
+\chapter{Đối chiếu tiêu chí chấm điểm}
+\begin{longtable}{p{4cm}p{7cm}p{3cm}}
+\toprule
+Tiêu chí & Minh chứng/kết quả hiện có & Đánh giá\\
+\midrule
+GitHub và README & Có thư mục dự án/Git pull/.env ignore; ảnh chưa cho thấy 3 commit và README hoàn chỉnh & Chưa đủ minh chứng\\
+Ứng dụng + PostgreSQL + pgAdmin & DB kết nối; CRUD contact/interaction tốt; POST customer 500; pgAdmin chưa có ảnh giao diện & Một phần\\
+Nginx reverse proxy & Nginx phục vụ tuyến, access log; loopback bind; 404 kỳ vọng & Đạt một phần\\
+Prometheus + Grafana & Prometheus up và exporter up; Grafana provisioning; cAdvisor/PG collector lỗi; UI chưa xác nhận & Một phần\\
+Loki + LogQL & Loki chạy, nhưng Promtail HTTP 400; chưa có query thành công & Chưa đạt\\
+Hardening & App/DB non-root, .env ignore, DB không publish; một số dịch vụ root, còn thiếu ảnh headers/network & Một phần\\
+Tổng thể/demo & 11 service chạy, nhiều luồng nghiệp vụ được kiểm thử; còn lỗi và thiếu ảnh hoàn thiện & Cần khắc phục\\
+\bottomrule
+\end{longtable}
+Đánh giá trên là tự đánh giá theo bằng chứng hiện có, không phải điểm chính thức. Báo cáo không tự gán điểm khi chưa đủ minh chứng.
+
+\chapter{Kết luận và hướng phát triển}
+Đề tài đã hình thành được một stack CRM có ứng dụng, PostgreSQL, Nginx và các thành phần giám sát/log chạy bằng Docker Compose. Các kiểm thử cho thấy DB kết nối, health endpoint phản ánh đúng tình trạng DB, thao tác liên hệ và tương tác được ghi nhận trong DB, Prometheus scrape một số target và Nginx access log có thể quan sát qua stdout. Các bằng chứng cũng cho thấy một số biện pháp hardening cơ bản.
+Tuy nhiên, hiện chưa thể xem hệ thống hoàn tất toàn bộ tiêu chí: tạo khách hàng lỗi 500; Promtail chưa gửi được log; cAdvisor thiếu metrics theo nhãn Compose; PostgreSQL exporter thiếu quyền ở collector WAL; Grafana chưa được xác nhận mở từ host; một số tiêu chí GitHub, pgAdmin, LogQL và bảo mật còn thiếu ảnh minh chứng. Các lỗi này đã được liệt kê kèm hành động khắc phục ở chương trước.
+Sau khi hoàn tất sửa lỗi, cần chạy lại toàn bộ test case, lưu ảnh trước/sau, xác nhận ba commit rõ nội dung, rà soát README và thông tin cá nhân, cập nhật kết quả ở các bảng trạng thái. Khi đó báo cáo mới phản ánh trạng thái cuối của hệ thống tại ngày nộp.
+
+\chapter*{Tài liệu tham khảo}
+\begin{enumerate}
+\item Tài liệu yêu cầu đề tài thực hành môn Triển khai và Quản trị Hệ thống Phần mềm, Đề 4: Hệ thống CRM Chăm sóc Khách hàng, do sinh viên cung cấp.
+\item Tài liệu vận hành Docker Compose và các ảnh chụp màn hình kiểm thử dự án \texttt{my-new-project}, ngày 23/10/2026.
+\item Tài liệu chính thức của Docker Compose, PostgreSQL, Nginx, Prometheus, Grafana, Loki và Promtail. Sinh viên bổ sung URL/phiên bản tài liệu cụ thể đã tham khảo trước khi nộp.
+\end{enumerate}
+
+\appendix
+\chapter{Phụ lục: minh chứng kiểm thử bổ sung}
+Các ảnh dưới đây là ảnh chụp từ phiên kiểm thử được người học cung cấp. Khi dàn trang, cần kiểm tra ảnh hiển thị rõ và không lộ thông tin nhạy cảm. Nếu đường dẫn tạm không còn tồn tại, hãy thay bằng ảnh gốc được sao chép vào thư mục báo cáo.
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-f154f622-cd49-46e6-8d15-36ccdcecc23a.png}{Endpoint health trả healthy và DB connected.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-ca01ebaa-ec36-4a3a-8509-be58be81e56a.png}{Log health check khi DB mất kết nối.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-e94c188c-070e-4160-97d9-f97e8109d567.png}{Endpoint health chuyển sang 503 khi DB không khả dụng.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-6bb01816-ccb0-4aa1-a692-0880f13901fd.png}{Ứng dụng chạy bằng UID 100, không phải root.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-dc7d7739-1671-482a-8e30-df0671a61d2f.png}{Cổng PostgreSQL 5432 không được publish ra host.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-9ef2729c-9ec2-42bc-aa6e-876520e17be8.png}{Git bỏ qua .env và không theo dõi các file bí mật được truy vấn.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-8604330a-cd1f-41aa-81c3-0814ab7f5d3c.png}{Ứng dụng ghi log JSON cho tuyến không tồn tại với status 404.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-1dd6238f-edec-4e3c-aa17-ea476e4e44e8.png}{Tiến trình PostgreSQL chạy dưới UID 70.}
+\evidence{C:/Users/hohat/AppData/Local/Temp/codex-clipboard-b98cf9a7-0942-4243-9f64-649b0c778859.png}{Danh sách tiến trình của các dịch vụ tại thời điểm kiểm thử.}
+
+\chapter*{Danh sách cần điền trước khi nộp}
+\begin{itemize}
+\item Điền trường, khoa, sinh viên, MSSV, lớp, giảng viên và địa danh trên bìa.
+\item Gắn URL GitHub thật; bổ sung ảnh \texttt{git log --oneline} thể hiện ba commit theo yêu cầu.
+\item Cập nhật kết quả sau khi khắc phục các lỗi ở Chương 11; không giữ trạng thái cũ nếu hệ thống đã sửa.
+\item Bổ sung ảnh giao diện pgAdmin, Grafana, LogQL, security headers và network isolation.
+\item Kiểm tra toàn bộ ảnh hiển thị, tiêu đề/mục lục/số trang và độ dài tối thiểu 10 trang trước khi xuất bản nộp.
+\end{itemize}
+\end{document}
