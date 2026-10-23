@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "CRM customer, contact, and interaction management app",
-  "main": "server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
-    "ejs": "^7.0.2",
+    "ejs": "^3.1.10",
     "express": "4.21.2",
     "express-validator": "^7.3.2",
     "method-override": "^3.0.0",

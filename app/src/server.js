@@ -14,7 +14,7 @@ const customerService     = require('./services/customerService');
 const interactionService  = require('./services/interactionService');
 
 const app  = express();
-const PORT = parseInt(process.env.APP_PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || process.env.APP_PORT || '3000', 10);
 
 // ── View engine ─────────────────────────────────────────────
 app.set('view engine', 'ejs');

@@ -4,11 +4,12 @@ CREATE TABLE customers (
   company_name VARCHAR(200),
   email VARCHAR(254),
   phone VARCHAR(40),
-  status VARCHAR(20) NOT NULL DEFAULT 'prospect' CHECK (status IN ('prospect','active','customer','inactive')),
+  status VARCHAR(20) NOT NULL DEFAULT 'lead' CHECK (status IN ('lead','nurturing','active','inactive')),
   industry VARCHAR(120),
   address TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ
 );
 CREATE TABLE contacts (
   id BIGSERIAL PRIMARY KEY,
@@ -36,5 +37,3 @@ ALTER TABLE interactions ADD CONSTRAINT interactions_contact_customer_fk
   ON DELETE SET NULL (contact_id);
 CREATE INDEX contacts_customer_idx ON contacts(customer_id);
 CREATE INDEX interactions_customer_time_idx ON interactions(customer_id, occurred_at DESC);
-
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
