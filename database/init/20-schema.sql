@@ -36,3 +36,5 @@ ALTER TABLE interactions ADD CONSTRAINT interactions_contact_customer_fk
   ON DELETE SET NULL (contact_id);
 CREATE INDEX contacts_customer_idx ON contacts(customer_id);
 CREATE INDEX interactions_customer_time_idx ON interactions(customer_id, occurred_at DESC);
+
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
