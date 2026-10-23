@@ -38,7 +38,7 @@ services:
       db: { condition: service_healthy }
     networks: [edge, data, monitoring]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -68,7 +68,7 @@ services:
       app: { condition: service_healthy }
     networks: [edge, monitoring]
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/nginx-health || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/nginx-health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

@@ -75,7 +75,7 @@ Hệ thống giải quyết bài toán quản trị quan hệ khách hàng cho d
                                                   │  khiển giám    │
      ┌──────────────┐     Docker Socket           │  sát & Log)    │
      │   Promtail   │──────────────────────► Loki │                │
-     │    v2.9.8    │   (Thu thập stdout)   v2.9.8└────────▲───────┘
+     │    v2.9.6    │   (Thu thập stdout)   v2.9.6└────────▲───────┘
      └──────────────┘                                      │
             │                                              │
             └────────── Đẩy log qua HTTP API ──────────────┘
@@ -101,8 +101,8 @@ Hệ thống phân tách mạng nội bộ thành 3 Docker Networks độc lập
 | `postgres-exporter` | `crm-postgres-exporter` | `prometheuscommunity/postgres-exporter` | Exporter trích xuất metrics PostgreSQL | Không expose host | `data`, `monitoring` |
 | `nginx-exporter` | `crm-nginx-exporter` | `nginx/nginx-prometheus-exporter` | Exporter đọc Nginx `stub_status` | Không expose host | `edge`, `monitoring` |
 | `cadvisor` | `crm-cadvisor` | `gcr.io/cadvisor/cadvisor` | Giám sát CPU, RAM, Network container | Không expose host | `monitoring` |
-| `loki` | `crm-loki` | `grafana/loki:2.9.8` | Máy chủ lưu trữ và xử lý Log tập trung | `3100` | `monitoring` |
-| `promtail` | `crm-promtail` | `grafana/promtail:2.9.8` | Thu thập log container từ Docker Socket | Không expose host | `monitoring` |
+| `loki` | `crm-loki` | `grafana/loki:2.9.6` | Máy chủ lưu trữ và xử lý Log tập trung | Không expose host | `monitoring` |
+| `promtail` | `crm-promtail` | `grafana/promtail:2.9.6` | Thu thập log container từ Docker Socket | Không expose host | `monitoring` |
 
 ---
 

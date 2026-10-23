@@ -48,8 +48,8 @@
     })();
 
     // ── Confirm delete ────────────────────────────────────────
-    function confirmDelete(form, label) {
-      label = label || 'mục này';
+    function confirmDelete(form) {
+      var label = form.getAttribute('data-confirm') || 'mục này';
       if (confirm('Bạn có chắc chắn muốn xóa ' + label + '?')) {
         form.submit();
       }

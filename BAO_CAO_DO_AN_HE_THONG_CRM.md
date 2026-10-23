@@ -292,10 +292,10 @@ Dashboard được nạp tự động qua cơ chế provisioning (`crm-overview.
 Thay vì phải truy cập thủ công vào từng container bằng lệnh `docker logs`, toàn bộ luồng stdout/stderr từ tất cả các container được Promtail tự động đọc qua Docker Socket và đẩy về máy chủ Loki để lưu trữ và lập chỉ mục (indexing).
 
 ### 7.2. Gắn nhãn thống nhất (Labeling) theo Hợp đồng tích hợp
-Promtail cấu hình trích xuất nhãn theo đúng thỏa thuận:
-- Container `crm-app` → Gán nhãn `service="app"`
-- Container `crm-nginx` → Gán nhãn `service="nginx"`
-- Container `crm-db` → Gán nhãn `service="db"`
+Promtail gán nhãn dựa trên label `com.docker.compose.service` do Docker Compose tự động đặt lên từng container — nhờ vậy kết quả nhất quán bất kể tên thư mục/project (vd `crm`, `MSSV-crm-customer-care`, …):
+- Service `app` → Gán nhãn `service="app"`
+- Service `nginx` → Gán nhãn `service="nginx"`
+- Service `db` → Gán nhãn `service="db"`
 
 ### 7.3. Thực thi 3 truy vấn LogQL bắt buộc
 

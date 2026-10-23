@@ -78,7 +78,7 @@
                   </svg>
                 </a>
                 <form method="POST" action="/customers/<%= c.id %>?_method=DELETE" style="display:inline"
-                      onsubmit="return confirmDelete(this, '<%= c.name %>')">
+                      data-confirm="<%= c.name %>" onsubmit="return confirmDelete(this)">
                   <button type="submit" class="btn-icon btn-icon-danger" title="Xóa">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="3 6 5 6 21 6"/>

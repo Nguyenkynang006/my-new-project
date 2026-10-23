@@ -22,35 +22,26 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Chỉ thu thập log của các containers thuộc dự án CRM (crm-*)
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/?(crm-[a-zA-Z0-9_-]+)'
+      # Chỉ thu thập log của các service CRM (app/nginx/db).
+      # Dùng label com.docker.compose.service do Docker Compose tự đặt nên
+      # KHÔNG phụ thuộc tên thư mục/project: nếu repo được đặt tên khác
+      # (vd "MSSV-crm-customer-care"), tên container không còn bắt đầu bằng
+      # "crm-" và các rule dựa trên tên container sẽ không gán được nhãn service.
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        regex: '^(app|nginx|db)$'
         action: keep
 
-      # Gán nhãn tên container
+      # Gán nhãn service theo đúng service name trong docker-compose
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+
+      # Gán nhãn tên container (bỏ ký tự "/" ở đầu)
       - source_labels: ['__meta_docker_container_name']
         regex: '/?(.*)'
         target_label: 'container'
+        replacement: '$1'
 
-      # Hợp đồng tích hợp: Thống nhất nhãn service=app
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/?crm-app'
-        target_label: 'service'
-        replacement: 'app'
-
-      # Hợp đồng tích hợp: Thống nhất nhãn service=nginx
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/?crm-nginx'
-        target_label: 'service'
-        replacement: 'nginx'
-
-      # Hợp đồng tích hợp: Thống nhất nhãn service=db
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/?crm-db'
-        target_label: 'service'
-        replacement: 'db'
-
-      # Gán nhãn môi trường và job
+      # Nhãn ổn định cho query/group-by
       - target_label: 'job'
         replacement: 'crm-docker'
       - target_label: 'environment'

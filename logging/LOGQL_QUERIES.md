@@ -19,7 +19,7 @@ Tài liệu này cung cấp các câu lệnh **LogQL** phục vụ chấm điể
 ### Mục đích:
 Xác minh sự kiện nghiệp vụ khi nhân viên tạo mới một khách hàng trên giao diện CRM. Hệ thống Express ghi log cấu trúc JSON:
 ```json
-{"timestamp":"2026-10-22T15:30:00.000Z","level":"info","event":"customer_created","customerId":12,"customerName":"Công ty TNHH Giải pháp Số","service":"crm-app"}
+{"level":"INFO","event":"customer_created","customer_id":12,"name":"Công ty TNHH Giải pháp Số","timestamp":"2026-10-22T15:30:00.000Z"}
 ```
 
 ---
@@ -33,7 +33,7 @@ Xác minh sự kiện nghiệp vụ khi nhân viên tạo mới một khách hà
 
 ### Câu lệnh LogQL lọc theo level error trong JSON:
 ```logql
-{service="app"} | json | level = "error"
+{service="app"} | json | level = "ERROR"
 ```
 
 ### Mục đích:
@@ -60,7 +60,7 @@ Giám sát các request không hợp lệ (404 Not Found, 400 Bad Request, 403 F
 {service="app"} |= "interaction_created"
 ```
 
-### Xem log các truy vấn từ PostgreSQL:
+### Xem log từ container PostgreSQL (`db`):
 ```logql
 {service="db"}
 ```
