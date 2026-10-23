@@ -31,8 +31,12 @@ schema_config:
         period: 24h
 
 storage_config:
-  tsdb:
-    dir: /loki/tsdb
+  # TSDB index shipper (Loki >= 2.8). Khóa đúng là `tsdb_shipper`, KHÔNG phải `tsdb`
+  # (type storage.Config không có field `tsdb` → Loki báo "field tsdb not found").
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+    shared_store: filesystem
   filesystem:
     directory: /loki/chunks
 
