@@ -80,7 +80,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set PGADMIN_DEFAULT_EMAIL in .env}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set PGADMIN_DEFAULT_PASSWORD in .env}
       PGADMIN_LISTEN_PORT: "80"
-    ports: ["127.0.0.1:5050:80"]
+    ports: ["${BIND_ADDR:-127.0.0.1}:5050:80"]
     networks: [data]
     depends_on:
       db: { condition: service_healthy }
@@ -90,8 +90,8 @@ services:
     build: ./nginx
     restart: unless-stopped
     ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
+      - "${BIND_ADDR:-127.0.0.1}:80:80"
+      - "${BIND_ADDR:-127.0.0.1}:443:443"
     depends_on:
       app: { condition: service_healthy }
     networks: [edge, monitoring]
@@ -125,7 +125,7 @@ services:
   # v0.53.0+ dùng registry ghcr.io/google/cadvisor (gcr.io chỉ còn cho bản cũ).
   # v0.54.0 có fix hỗ trợ containerd-snapshotter (lỗi "read-write layer ID").
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.54.0
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     restart: unless-stopped
     privileged: true
     # --docker_only: chỉ thu thập container Docker (bỏ cgroup /system.slice/...),
@@ -158,10 +158,10 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    ports: ["127.0.0.1:9090:9090"]
+    ports: ["${BIND_ADDR:-127.0.0.1}:9090:9090"]
     depends_on:
       app: { condition: service_healthy }
-    networks: [monitoring]
+    networks: [edge, monitoring]
 
   # ── Grafana ────────────────────────────────────────────────
   grafana:
@@ -184,10 +184,10 @@ services:
       - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
-    ports: ["127.0.0.1:3001:3000"]
+    ports: ["${BIND_ADDR:-127.0.0.1}:3001:3000"]
     depends_on:
       prometheus: { condition: service_started }
-    networks: [monitoring]
+    networks: [edge, monitoring]
 
   # ── Loki (Centralized Logging) ─────────────────────────────
   loki:
