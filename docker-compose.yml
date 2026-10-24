@@ -81,7 +81,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set PGADMIN_DEFAULT_PASSWORD in .env}
       PGADMIN_LISTEN_PORT: "80"
     ports: ["${BIND_ADDR:-127.0.0.1}:5050:80"]
-    networks: [data]
+    networks: [data, edge]
     depends_on:
       db: { condition: service_healthy }
 
